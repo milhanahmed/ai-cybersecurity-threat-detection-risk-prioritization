@@ -1,0 +1,11 @@
+flowchart TD
+A[Cybersecurity Logs / Events] --> B[Data Ingestion and Validation]
+B --> C[Preprocessing and Feature Engineering]
+C --> D[AI Threat Classification]
+D --> E[Risk Prioritization]
+E --> F[API / Service Layer]
+F --> G[(Database / Audit Log)]
+F --> H[Analyst Dashboard]
+H --> I[Human Review and Feedback]
+I --> D
+E --> J[Model Evaluation]
