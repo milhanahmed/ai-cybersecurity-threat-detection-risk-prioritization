@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Generated model/data artifacts
+*.pkl
+*.joblib
+*.h5
+data/raw/
+data/private/
+
+# Logs
+*.log
