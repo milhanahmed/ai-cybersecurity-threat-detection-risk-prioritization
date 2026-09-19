@@ -13,7 +13,7 @@ The project follows a two-branch workflow:
 - `main`: stable, submission-ready baseline.
 - `development`: active implementation and integration work.
 
-Changes should be developed on `development), reviewed/tested, and then merged into `main) when stable.
+Changes should be developed on `development`, reviewed/tested, and then merged into `main` when stable.
 
 ## Repository structure
 ```text
