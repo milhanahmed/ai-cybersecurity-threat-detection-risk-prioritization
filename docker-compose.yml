@@ -1,0 +1,13 @@
+services:
+  capstone-app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      CYBER_DB_PATH: /app/data/cybersecurity.db
+    volumes:
+      - cyber_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  cyber_data:
