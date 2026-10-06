@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cybersecurity Risk Prioritization Dashboard</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;background:#f4f6f8;color:#1f2937}.wrap{max-width:1100px;margin:30px auto;padding:0 18px}.card{background:white;border-radius:10px;padding:20px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,.08)}h1{margin-top:0}form{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}input,select,button{padding:10px;border:1px solid #cbd5e1;border-radius:6px}button{background:#111827;color:white;cursor:pointer}.full{grid-column:1/-1}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:left}.high{font-weight:bold}.medium{font-weight:bold}.low{font-weight:bold}#result{white-space:pre-wrap;background:#f8fafc;padding:12px;border-radius:6px}@media(max-width:700px){form{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>AI-Assisted Cybersecurity Risk Dashboard</h1>
+    <p>Submit a security event for validation, AI classification, risk scoring, persistence, and analyst review.</p>
+  </div>
+  <div class="card">
+    <h2>Analyze Event</h2>
+    <form id="eventForm">
+      <input id="event_id" placeholder="Event ID" value="E-1001" required />
+      <input id="timestamp" placeholder="Timestamp" value="2026-10-06T12:00:00Z" required />
+      <input id="source" placeholder="Source" value="vpn-gateway" required />
+      <select id="event_type"><option>login_failure</option><option>malware_alert</option><option>privilege_change</option><option>login_success</option></select>
+      <input id="failed_attempts" type="number" min="0" value="8" />
+      <select id="known_bad_ip"><option value="1">Known bad IP: Yes</option><option value="0">Known bad IP: No</option></select>
+      <select id="privileged_account"><option value="1">Privileged account: Yes</option><option value="0">Privileged account: No</option></select>
+      <input id="severity" type="number" min="0" max="1" step="0.1" value="0.9" />
+      <input id="business_impact" type="number" min="0" max="1" step="0.1" value="0.8" />
+      <button class="full" type="submit">Analyze Security Event</button>
+    </form>
+    <h3>Latest Output</h3><div id="result">No event analyzed yet.</div>
+  </div>
+  <div class="card">
+    <h2>Recent Analyzed Events</h2>
+    <table><thead><tr><th>Event</th><th>Type</th><th>Prediction</th><th>Confidence</th><th>Risk</th><th>Priority</th></tr></thead><tbody id="eventsBody"></tbody></table>
+  </div>
+</div>
+<script>
+async function loadEvents(){const r=await fetch('/events'); const data=await r.json(); const body=document.getElementById('eventsBody'); body.innerHTML=''; data.events.forEach(e=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${e.event_id}</td><td>${e.event_type}</td><td>${e.predicted_label}</td><td>${e.confidence}</td><td>${e.risk_score}</td><td class="${e.priority}">${e.priority.toUpperCase()}</td>`; body.appendChild(tr);});}
+document.getElementById('eventForm').addEventListener('submit', async (ev)=>{ev.preventDefault(); const payload={event_id:event_id.value,timestamp:timestamp.value,source:source.value,event_type:event_type.value,failed_attempts:+failed_attempts.value,known_bad_ip:+known_bad_ip.value,privileged_account:+privileged_account.value,severity:+severity.value,business_impact:+business_impact.value}; const r=await fetch('/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const data=await r.json(); document.getElementById('result').textContent=JSON.stringify(data,null,2); await loadEvents();});
+loadEvents();
+</script>
+</body>
+</html>
