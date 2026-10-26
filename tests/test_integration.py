@@ -6,7 +6,10 @@ os.environ["CYBER_DB_PATH"] = "data/test_cybersecurity.db"
 from fastapi.testclient import TestClient
 from src.api.app import app
 
+os.environ["CYBER_USERNAME"] = "test-analyst"
+os.environ["CYBER_PASSWORD"] = "test-only-password-26"
 client = TestClient(app)
+client.auth = ("test-analyst", "test-only-password-26")
 
 
 def test_health_endpoint():

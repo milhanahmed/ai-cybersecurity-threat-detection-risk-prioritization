@@ -1,11 +1,16 @@
 """Integrated FastAPI application for the capstone prototype."""
 
 from pathlib import Path
+from datetime import datetime
+from typing import Literal
+import os
+import secrets
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from src.database.database import init_db, list_analyses, save_analysis
 from src.ingestion.ingestion import validate_event
@@ -29,16 +34,35 @@ classifier = ThreatClassifier().fit(BASELINE_FEATURES, BASELINE_LABELS)
 init_db()
 
 
+security = HTTPBasic(auto_error=False)
+
+
+def require_analyst(credentials: HTTPBasicCredentials = Depends(security)) -> str:
+    expected_user = os.environ.get("CYBER_USERNAME", "")
+    expected_password = os.environ.get("CYBER_PASSWORD", "")
+    if not expected_user or len(expected_password) < 16:
+        raise HTTPException(status_code=503, detail="Analyst credentials are not configured.")
+    user = credentials.username.encode("utf-8") if credentials else b""
+    password = credentials.password.encode("utf-8") if credentials else b""
+    valid_user = secrets.compare_digest(user, expected_user.encode("utf-8"))
+    valid_password = secrets.compare_digest(password, expected_password.encode("utf-8"))
+    if not (valid_user and valid_password):
+        raise HTTPException(status_code=401, detail="Authentication required.",
+                            headers={"WWW-Authenticate": 'Basic realm="Capstone analyst"'})
+    return expected_user
+
+
 class AnalyzeRequest(BaseModel):
-    event_id: str
-    timestamp: str
-    source: str
-    event_type: str
-    failed_attempts: int = 0
-    known_bad_ip: int = 0
-    privileged_account: int = 0
-    severity: float = 0.5
-    business_impact: float = 0.5
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", allow_inf_nan=False)
+    event_id: str = Field(min_length=1, max_length=128)
+    timestamp: datetime
+    source: str = Field(min_length=1, max_length=128)
+    event_type: Literal["login_success", "file_read", "login_failure", "malware_alert", "privilege_change"]
+    failed_attempts: int = Field(default=0, ge=0, le=1000000, strict=True)
+    known_bad_ip: Literal[0, 1] = 0
+    privileged_account: Literal[0, 1] = 0
+    severity: float = Field(default=0.5, ge=0, le=1)
+    business_impact: float = Field(default=0.5, ge=0, le=1)
 
 
 @app.get("/health")
@@ -47,8 +71,8 @@ def health() -> Dict[str, str]:
 
 
 @app.post("/analyze")
-def analyze(request: AnalyzeRequest) -> Dict[str, Any]:
-    raw = request.model_dump()
+def analyze(request: AnalyzeRequest, analyst: str = Depends(require_analyst)) -> Dict[str, Any]:
+    raw = request.model_dump(mode="json")
     event = {k: raw[k] for k in ("event_id", "timestamp", "source", "event_type")}
     if not validate_event(event):
         raise HTTPException(status_code=400, detail="Required event fields are missing.")
@@ -76,11 +100,11 @@ def analyze(request: AnalyzeRequest) -> Dict[str, Any]:
 
 
 @app.get("/events")
-def events(limit: int = 50):
+def events(limit: int = 50, analyst: str = Depends(require_analyst)):
     return {"events": list_analyses(limit=max(1, min(limit, 100)))}
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard() -> str:
+def dashboard(analyst: str = Depends(require_analyst)) -> str:
     dashboard_path = Path(__file__).resolve().parents[1] / "dashboard" / "index.html"
     return dashboard_path.read_text(encoding="utf-8")

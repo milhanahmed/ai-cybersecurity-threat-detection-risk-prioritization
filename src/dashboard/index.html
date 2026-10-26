@@ -17,18 +17,18 @@
   <div class="card">
     <h2>Analyze Event</h2>
     <form id="eventForm">
-      <input id="event_id" placeholder="Event ID" value="E-1001" required />
-      <input id="timestamp" placeholder="Timestamp" value="2026-10-06T12:00:00Z" required />
-      <input id="source" placeholder="Source" value="vpn-gateway" required />
-      <select id="event_type"><option>login_failure</option><option>malware_alert</option><option>privilege_change</option><option>login_success</option></select>
-      <input id="failed_attempts" type="number" min="0" value="8" />
-      <select id="known_bad_ip"><option value="1">Known bad IP: Yes</option><option value="0">Known bad IP: No</option></select>
-      <select id="privileged_account"><option value="1">Privileged account: Yes</option><option value="0">Privileged account: No</option></select>
-      <input id="severity" type="number" min="0" max="1" step="0.1" value="0.9" />
-      <input id="business_impact" type="number" min="0" max="1" step="0.1" value="0.8" />
+      <input maxlength="128" aria-label="Event ID" id="event_id" placeholder="Event ID" value="E-1001" required />
+      <input aria-label="Timestamp in ISO 8601 format" id="timestamp" placeholder="Timestamp" value="2026-10-26T12:00:00Z" required />
+      <input maxlength="128" aria-label="Event source" id="source" placeholder="Source" value="vpn-gateway" required />
+      <select aria-label="Event type" id="event_type"><option>login_failure</option><option>malware_alert</option><option>privilege_change</option><option>login_success</option><option>file_read</option></select>
+      <input aria-label="Failed attempts" id="failed_attempts" type="number" min="0" value="8" />
+      <select aria-label="Known bad IP indicator" id="known_bad_ip"><option value="1">Known bad IP: Yes</option><option value="0">Known bad IP: No</option></select>
+      <select aria-label="Privileged account indicator" id="privileged_account"><option value="1">Privileged account: Yes</option><option value="0">Privileged account: No</option></select>
+      <input aria-label="Severity from zero to one" id="severity" type="number" min="0" max="1" step="0.1" value="0.9" />
+      <input aria-label="Business impact from zero to one" id="business_impact" type="number" min="0" max="1" step="0.1" value="0.8" />
       <button class="full" type="submit">Analyze Security Event</button>
     </form>
-    <h3>Latest Output</h3><div id="result">No event analyzed yet.</div>
+    <h3>Latest Output</h3><div id="result" role="status" aria-live="polite">No event analyzed yet.</div>
   </div>
   <div class="card">
     <h2>Recent Analyzed Events</h2>
@@ -36,9 +36,58 @@
   </div>
 </div>
 <script>
-async function loadEvents(){const r=await fetch('/events'); const data=await r.json(); const body=document.getElementById('eventsBody'); body.innerHTML=''; data.events.forEach(e=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${e.event_id}</td><td>${e.event_type}</td><td>${e.predicted_label}</td><td>${e.confidence}</td><td>${e.risk_score}</td><td class="${e.priority}">${e.priority.toUpperCase()}</td>`; body.appendChild(tr);});}
-document.getElementById('eventForm').addEventListener('submit', async (ev)=>{ev.preventDefault(); const payload={event_id:event_id.value,timestamp:timestamp.value,source:source.value,event_type:event_type.value,failed_attempts:+failed_attempts.value,known_bad_ip:+known_bad_ip.value,privileged_account:+privileged_account.value,severity:+severity.value,business_impact:+business_impact.value}; const r=await fetch('/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const data=await r.json(); document.getElementById('result').textContent=JSON.stringify(data,null,2); await loadEvents();});
-loadEvents();
+async function readResponse(response) {
+  const data = await response.json();
+  if (!response.ok) {
+    const message = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+    throw new Error(message || `Request failed (${response.status})`);
+  }
+  return data;
+}
+async function loadEvents() {
+  const response = await fetch('/events');
+  const data = await readResponse(response);
+  const body = document.getElementById('eventsBody');
+  body.replaceChildren();
+  data.events.forEach(event => {
+    const row = document.createElement('tr');
+    [event.event_id, event.event_type, event.predicted_label, event.confidence,
+     event.risk_score, event.priority.toUpperCase()].forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = String(value);
+      row.appendChild(cell);
+    });
+    body.appendChild(row);
+  });
+}
+document.getElementById('eventForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const form = ev.currentTarget;
+  const result = document.getElementById('result');
+  const button = form.querySelector('button');
+  const value = id => document.getElementById(id).value.trim();
+  if (!form.reportValidity()) return;
+  if (!value('event_id') || !value('source')) {
+    result.textContent = 'Event ID and source must contain non-space characters.';
+    return;
+  }
+  const payload = {event_id:value('event_id'), timestamp:value('timestamp'),
+    source:value('source'), event_type:value('event_type'),
+    failed_attempts:Number(value('failed_attempts')), known_bad_ip:Number(value('known_bad_ip')),
+    privileged_account:Number(value('privileged_account')), severity:Number(value('severity')),
+    business_impact:Number(value('business_impact'))};
+  button.disabled = true;
+  try {
+    const response = await fetch('/analyze', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const data = await readResponse(response);
+    result.textContent = JSON.stringify(data, null, 2);
+    await loadEvents();
+  } catch (error) {
+    result.textContent = 'Request could not be completed: ' + error.message;
+  } finally { button.disabled = false; }
+});
+loadEvents().catch(error => {document.getElementById('result').textContent = error.message;});
 </script>
 </body>
 </html>

@@ -28,3 +28,8 @@ data/private/
 
 # Logs
 *.log
+
+# Local SQLite databases
+*.db
+*.db-*
+.pytest_cache/
